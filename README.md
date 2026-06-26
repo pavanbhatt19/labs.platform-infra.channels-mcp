@@ -122,7 +122,24 @@ Ask your AI: "List all channel servers" or "Investigate cha3.abn.green.sophos"
 - `SSH_AUTH_SOCK` is **auto-detected** on macOS — the MCP scans `/var/run/com.apple.launchd.*` to find the agent socket automatically
 - You do NOT need to hardcode it in the config (it changes on every reboot anyway)
 - Just make sure your key is loaded: `ssh-add ~/.ssh/id_rsa` before using the MCP
+- **Verify your key is loaded:** Run `ssh-add -l` — you should see your key listed. If it says "The agent has no identities", run `ssh-add ~/.ssh/id_rsa` first
 - The MCP connects as your SSH user and **all commands run as the `channel` user** via `sudo su - channel -c "..."`
+
+### Pre-flight Check
+Before your first use, confirm everything is ready:
+```bash
+# 1. Is your SSH key loaded?
+ssh-add -l
+# Should show your key. If not: ssh-add ~/.ssh/id_rsa
+
+# 2. Can you SSH to a channel server manually?
+ssh your_username@cha3.abn.green.sophos
+# Should connect without password prompt. If not, your key isn't authorized on the server.
+
+# 3. Is Node.js installed?
+node --version
+# Should be 18+
+```
 
 ### How Kiro/Claude Desktop starts the MCP
 - You do NOT run `npm run dev` or `node dist/index.js` manually
