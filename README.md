@@ -52,15 +52,9 @@ ssh-add ~/.ssh/id_rsa
 
 Verify it's loaded: `ssh-add -l`
 
-### 3. Find your SSH_AUTH_SOCK
+### 3. Add to your AI tool's MCP config
 
-```bash
-echo $SSH_AUTH_SOCK
-```
-
-You'll need this value for the MCP config below.
-
-### 4. Add to your AI tool's MCP config
+`SSH_AUTH_SOCK` is **auto-detected** on macOS — you don't need to set it manually. The MCP will find your SSH agent socket automatically as long as your key is loaded with `ssh-add`.
 
 **Kiro** (`~/.kiro/settings/mcp.json`):
 ```json
@@ -71,7 +65,6 @@ You'll need this value for the MCP config below.
       "args": ["/full/path/to/labs.platform-infra.channels-mcp/dist/index.js"],
       "env": {
         "SSH_USERNAME": "your_ssh_username",
-        "SSH_AUTH_SOCK": "/var/run/com.apple.launchd.xxx/Listeners",
         "ZABBIX_URL": "https://zabbix.sophosapps.com",
         "ZABBIX_API_TOKEN": "your_zabbix_api_token",
         "ATLASSIAN_HOST": "https://sophos.atlassian.net",
@@ -92,7 +85,6 @@ You'll need this value for the MCP config below.
       "args": ["/full/path/to/labs.platform-infra.channels-mcp/dist/index.js"],
       "env": {
         "SSH_USERNAME": "your_ssh_username",
-        "SSH_AUTH_SOCK": "/var/run/com.apple.launchd.xxx/Listeners",
         "ZABBIX_URL": "https://zabbix.sophosapps.com",
         "ZABBIX_API_TOKEN": "your_zabbix_api_token",
         "ATLASSIAN_HOST": "https://sophos.atlassian.net",
@@ -106,7 +98,7 @@ You'll need this value for the MCP config below.
 
 **Cursor/Cline** — same format, add to your MCP settings.
 
-### 5. Test it
+### 4. Test it
 
 Ask your AI: "List all channel servers" or "Investigate cha3.abn.green.sophos"
 
@@ -115,7 +107,7 @@ Ask your AI: "List all channel servers" or "Investigate cha3.abn.green.sophos"
 | Variable | Required | How to get it |
 |----------|----------|---------------|
 | `SSH_USERNAME` | Yes | Your SSH username for channel servers (e.g., `pavanbhatt`) |
-| `SSH_AUTH_SOCK` | Yes | Run `echo $SSH_AUTH_SOCK` in terminal |
+| `SSH_AUTH_SOCK` | No (auto-detected) | Auto-detected on macOS. Only set manually if auto-detection fails. |
 | `SSH_PRIVATE_KEY_PATH` | Optional | Alternative to SSH agent: path to your key (e.g., `~/.ssh/id_rsa`) |
 | `SSH_PASSPHRASE` | Optional | Passphrase for the private key (if using SSH_PRIVATE_KEY_PATH) |
 | `ZABBIX_URL` | Yes | `https://zabbix.sophosapps.com` |
@@ -123,6 +115,39 @@ Ask your AI: "List all channel servers" or "Investigate cha3.abn.green.sophos"
 | `ATLASSIAN_HOST` | Yes | `https://sophos.atlassian.net` |
 | `ATLASSIAN_EMAIL` | Yes | Your Sophos email (e.g., `your.name@sophos.com`) |
 | `ATLASSIAN_API_TOKEN` | Yes | https://id.atlassian.com/manage-profile/security/api-tokens → Create |
+
+## Important Notes
+
+### SSH Authentication
+- `SSH_AUTH_SOCK` is **auto-detected** on macOS — the MCP scans `/var/run/com.apple.launchd.*` to find the agent socket automatically
+- You do NOT need to hardcode it in the config (it changes on every reboot anyway)
+- Just make sure your key is loaded: `ssh-add ~/.ssh/id_rsa` before using the MCP
+- The MCP connects as your SSH user and **all commands run as the `channel` user** via `sudo su - channel -c "..."`
+
+### How Kiro/Claude Desktop starts the MCP
+- You do NOT run `npm run dev` or `node dist/index.js` manually
+- Your AI tool (Kiro, Claude Desktop, etc.) reads the MCP config and starts the server process itself
+- After updating the config, restart your AI tool or reconnect MCP servers (Kiro: command palette → "MCP: Reconnect Servers")
+- If the MCP doesn't appear in your tool list, check the MCP server panel for errors
+
+### After `git pull`
+If you pull new changes, rebuild the dist:
+```bash
+git pull
+npm run build
+```
+Then restart your AI tool or reconnect MCP servers.
+
+### Command Safety
+All SSH commands are enforced to run as the `channel` user. The following commands are **blocked** and will throw an error:
+- Package management: `yum`, `rpm install`, `apt`, `dnf`, `pip`
+- File deletion: `rm`, `rmdir`
+- Service control: `systemctl`, `service`, `kill`, `reboot`
+- File manipulation: `mv`, `cp`, `chmod`, `chown`
+- Editors: `vi`, `vim`, `nano`
+- Channel updates: `chwatcher`, `chupdate` (investigation only, no modifications)
+
+Read-only commands are allowed: `tail`, `cat`, `ls`, `find`, `stat`, `grep`, `df`, `ps`, `python` (for JSON parsing)
 
 ## Available Tools
 
@@ -188,6 +213,7 @@ Just ask your AI naturally:
 **"SSH connection failed: All authentication methods failed"**
 - Load your key: `ssh-add ~/.ssh/id_rsa`
 - Verify: `ssh-add -l` should show your key
+- If your key has a passphrase and isn't in the agent, you must `ssh-add` it first
 - Test manually: `ssh your_username@cha3.abn.green.sophos`
 
 **"ZABBIX_API_TOKEN not configured"**
@@ -199,6 +225,21 @@ Just ask your AI naturally:
 - Use your @sophos.com email as ATLASSIAN_EMAIL
 
 **MCP not showing up in your AI tool?**
-- Verify the path to `dist/index.js` is correct and absolute
+- Verify the path to `dist/index.js` is correct and **absolute** (e.g., `/Users/yourname/labs.platform-infra.channels-mcp/dist/index.js`)
 - Check Node.js is installed: `node --version` (need 18+)
-- Restart your AI tool after config changes
+- Do NOT run `npm run dev` manually — the AI tool starts the server itself
+- Restart your AI tool after config changes, or reconnect MCP servers
+- Check the MCP server panel for error messages
+
+**"BLOCKED: Command contains X which is not allowed"**
+- This means the command safety filter caught a dangerous operation
+- The MCP is read-only by design — it cannot run yum, rm, service restart, etc.
+- If you need to run a blocked command, do it manually via SSH
+
+**Tools appear but SSH fails silently**
+- The SSH_AUTH_SOCK is auto-detected on macOS, but if it fails, set it explicitly:
+  ```bash
+  echo $SSH_AUTH_SOCK   # copy this value
+  ```
+  Then add `"SSH_AUTH_SOCK": "your_value"` to the env config
+
