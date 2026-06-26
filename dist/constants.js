@@ -36,7 +36,7 @@ exports.INVESTIGATION_PATTERNS = {
         exitCode: null,
         cause: "chron scheduler hitting lock contention. Multiple cron entries competing.",
         rootCause: "Intermittent issue, channels will catch up",
-        action: "Transient — will auto-clear. Consider increasing delay_factor for DR servers.",
+        action: "Transient - will auto-clear. Consider increasing delay_factor for DR servers.",
     },
     TRAFFIX_DB_UNREACHABLE: {
         pattern: "Can't connect to MySQL server on 'traffix.labs.sophos'",

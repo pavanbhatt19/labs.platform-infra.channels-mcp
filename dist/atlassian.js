@@ -16,7 +16,7 @@ class AtlassianClient {
         if (this.connected)
             return;
         if (!this.email || !this.token) {
-            throw new Error("ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN not configured. Please set them in your MCP environment variables.");
+            throw new Error("ATLASSIAN_EMAIL and ATLASSIAN_API_TOKEN not configured.");
         }
         this.connected = true;
     }
@@ -25,38 +25,11 @@ class AtlassianClient {
         return result.issues || [];
     }
     async createIssue(projectKey, issueType, summary, description) {
-        const body = {
-            fields: {
-                project: { key: projectKey },
-                issuetype: { name: issueType },
-                summary,
-                description: {
-                    type: "doc",
-                    version: 1,
-                    content: [
-                        {
-                            type: "paragraph",
-                            content: [{ type: "text", text: description }],
-                        },
-                    ],
-                },
-            },
-        };
+        const body = { fields: { project: { key: projectKey }, issuetype: { name: issueType }, summary, description: { type: "doc", version: 1, content: [{ type: "paragraph", content: [{ type: "text", text: description }] }] } } };
         return await this.apiCall("/rest/api/3/issue", "POST", body);
     }
     async addComment(issueKey, comment) {
-        const body = {
-            body: {
-                type: "doc",
-                version: 1,
-                content: [
-                    {
-                        type: "paragraph",
-                        content: [{ type: "text", text: comment }],
-                    },
-                ],
-            },
-        };
+        const body = { body: { type: "doc", version: 1, content: [{ type: "paragraph", content: [{ type: "text", text: comment }] }] } };
         await this.apiCall(`/rest/api/3/issue/${issueKey}/comment`, "POST", body);
     }
     async searchConfluence(cql) {
@@ -67,34 +40,23 @@ class AtlassianClient {
         const urlObj = new URL(`${this.host}${path}`);
         const auth = Buffer.from(`${this.email}:${this.token}`).toString("base64");
         const options = {
-            hostname: urlObj.hostname,
-            port: 443,
-            path: `${urlObj.pathname}${urlObj.search}`,
-            method,
-            headers: {
-                Authorization: `Basic ${auth}`,
-                "Content-Type": "application/json",
-                Accept: "application/json",
-            },
+            hostname: urlObj.hostname, port: 443, path: `${urlObj.pathname}${urlObj.search}`, method,
+            headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json", Accept: "application/json" },
             rejectUnauthorized: true,
         };
         const bodyStr = body ? JSON.stringify(body) : undefined;
-        if (bodyStr) {
+        if (bodyStr)
             options.headers["Content-Length"] = Buffer.byteLength(bodyStr);
-        }
         return new Promise((resolve, reject) => {
             const req = https_1.default.request(options, (res) => {
                 let data = "";
                 res.on("data", (chunk) => (data += chunk));
-                res.on("end", () => {
-                    try {
-                        const json = JSON.parse(data);
-                        resolve(json);
-                    }
-                    catch (e) {
-                        reject(new Error(`Failed to parse Atlassian response: ${data.substring(0, 200)}`));
-                    }
-                });
+                res.on("end", () => { try {
+                    resolve(JSON.parse(data));
+                }
+                catch (e) {
+                    reject(new Error(`Failed to parse Atlassian response`));
+                } });
             });
             req.on("error", reject);
             if (bodyStr)

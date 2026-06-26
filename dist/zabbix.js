@@ -17,65 +17,32 @@ class ZabbixClient {
         if (!this.token) {
             throw new Error("ZABBIX_API_TOKEN not configured. Please set it in your MCP environment variables.");
         }
-        // Verify connection with a simple API call
         await this.apiCall("apiinfo.version", {});
         this.connected = true;
     }
     async getProblems(hostId) {
         const result = await this.apiCall("problem.get", {
-            hostids: [hostId],
-            recent: true,
-            sortfield: ["eventid"],
-            sortorder: "DESC",
-            limit: 50,
-            selectAcknowledges: "extend",
+            hostids: [hostId], recent: true, sortfield: ["eventid"], sortorder: "DESC", limit: 50, selectAcknowledges: "extend",
         });
         return result.map((p) => ({
-            eventid: p.eventid,
-            name: p.name,
-            severity: this.severityName(p.severity),
-            clock: new Date(parseInt(p.clock) * 1000).toISOString(),
-            acknowledged: p.acknowledged === "1",
+            eventid: p.eventid, name: p.name, severity: this.severityName(p.severity),
+            clock: new Date(parseInt(p.clock) * 1000).toISOString(), acknowledged: p.acknowledged === "1",
         }));
     }
     async acknowledgeProblems(eventIds, message) {
-        await this.apiCall("event.acknowledge", {
-            eventids: eventIds,
-            action: 6, // 2 (ack) + 4 (add message)
-            message: message,
-        });
+        await this.apiCall("event.acknowledge", { eventids: eventIds, action: 6, message });
     }
     severityName(severity) {
-        const names = {
-            "0": "Not classified",
-            "1": "Information",
-            "2": "Warning",
-            "3": "Average",
-            "4": "High",
-            "5": "Disaster",
-        };
+        const names = { "0": "Not classified", "1": "Information", "2": "Warning", "3": "Average", "4": "High", "5": "Disaster" };
         return names[severity] || "Unknown";
     }
     async apiCall(method, params) {
-        const body = JSON.stringify({
-            jsonrpc: "2.0",
-            method,
-            params,
-            id: 1,
-            auth: this.token,
-        });
+        const body = JSON.stringify({ jsonrpc: "2.0", method, params, id: 1, auth: this.token });
         return new Promise((resolve, reject) => {
             const urlObj = new URL(`${this.url}/api_jsonrpc.php`);
             const options = {
-                hostname: urlObj.hostname,
-                port: 443,
-                path: urlObj.pathname,
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Content-Length": Buffer.byteLength(body),
-                    Authorization: `Bearer ${this.token}`,
-                },
+                hostname: urlObj.hostname, port: 443, path: urlObj.pathname, method: "POST",
+                headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body), Authorization: `Bearer ${this.token}` },
                 rejectUnauthorized: false,
             };
             const req = https_1.default.request(options, (res) => {
@@ -84,15 +51,10 @@ class ZabbixClient {
                 res.on("end", () => {
                     try {
                         const json = JSON.parse(data);
-                        if (json.error) {
-                            reject(new Error(`Zabbix API error: ${json.error.message || json.error.data}`));
-                        }
-                        else {
-                            resolve(json.result);
-                        }
+                        json.error ? reject(new Error(`Zabbix API error: ${json.error.message || json.error.data}`)) : resolve(json.result);
                     }
                     catch (e) {
-                        reject(new Error(`Failed to parse Zabbix response: ${data.substring(0, 200)}`));
+                        reject(new Error(`Failed to parse Zabbix response`));
                     }
                 });
             });
