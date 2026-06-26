@@ -7,7 +7,27 @@ class SSHManager {
         this.connections = new Map();
         this.username = process.env.SSH_USERNAME || "pavanbhatt";
         this.privateKeyPath = process.env.SSH_PRIVATE_KEY_PATH;
-        this.authSock = process.env.SSH_AUTH_SOCK;
+        this.authSock = process.env.SSH_AUTH_SOCK || this.findAuthSock();
+    }
+    findAuthSock() {
+        // Auto-detect SSH_AUTH_SOCK on macOS
+        const fs = require("fs");
+        const path = require("path");
+        const launchdDir = "/var/run/com.apple.launchd.";
+        try {
+            const dirs = fs.readdirSync("/var/run").filter((d) => d.startsWith("com.apple.launchd."));
+            for (const dir of dirs) {
+                const sock = path.join("/var/run", dir, "Listeners");
+                if (fs.existsSync(sock))
+                    return sock;
+            }
+        }
+        catch (e) { /* ignore */ }
+        // Linux fallback
+        const defaultSock = `/run/user/${process.getuid?.() || 1000}/ssh-agent.sock`;
+        if (fs.existsSync(defaultSock))
+            return defaultSock;
+        return undefined;
     }
     async connect(hostname) {
         if (this.connections.has(hostname)) {

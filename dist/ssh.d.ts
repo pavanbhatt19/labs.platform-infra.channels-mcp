@@ -4,6 +4,7 @@ export declare class SSHManager {
     private privateKeyPath?;
     private authSock?;
     constructor();
+    private findAuthSock;
     connect(hostname: string): Promise<void>;
     execute(hostname: string, command: string): Promise<string>;
     disconnect(hostname: string): Promise<void>;
