@@ -117,7 +117,6 @@ export class SSHManager {
     "chmod", "chown",                          // permission changes
     "sed ", "awk ",                            // file editing
     "vi ", "vim ", "nano ", "emacs",           // editors
-    "echo ", "printf ",                        // writing to files (when combined with >)
     "truncate", "dd ",                         // destructive file ops
     "chwatcher", "chupdate",                   // channel update commands (read-only investigation only)
   ];
